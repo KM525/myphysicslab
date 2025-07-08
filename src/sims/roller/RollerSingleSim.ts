@@ -295,41 +295,41 @@ handleKeyEvent(_evt: KeyboardEvent, _pressed: boolean, _modifiers: ModifierKeys)
 
 /** @inheritDoc */
 evaluate(vars: number[], change: number[], _timeStep: number): null|object {
-  // 0  1    2   3  4   5   6   7     8        9
-  // p  v  time  x  y  ke  pe  te  anchorX  anchorY
   Util.zeroArray(change);
-  change[TIME] = 1; // time changes at a rate of 1 by definition.
+  change[TIME] = 1;
   if (this.dragObj_ != this.ball1_) {
-    // calculate the slope at the given arc-length position on the curve
-    // vars[TRACK_P] is p = path length position.
-    // so that we can reference spring position directly
     this.moveObjects(vars);
-    change[TRACK_P] = vars[TRACK_V];  // p' = v
-    // see Mathematica file 'roller.nb' for derivation of the following
-    // let k = slope of curve. Then sin(theta) = k/sqrt(1+k^2)
-    // Component due to gravity is v' = - g sin(theta) = - g k/sqrt(1+k^2)
-    const k = this.pathPoint_.slope;
-    const sinTheta = isFinite(k) ? k/Math.sqrt(1+k*k) : 1;
-    const mass = this.ball1_.getMass();
-    // v' = - g sin(theta) - (b/m) v= - g k/sqrt(1+k^2) - (b/m) v
-    change[TRACK_V] = -this.gravity_ * this.pathPoint_.direction * sinTheta
-        - this.damping_ * vars[TRACK_V] / mass;
+    change[TRACK_P] = vars[TRACK_V];
+
+    const k        = this.pathPoint_.slope;
+    const sinTheta = isFinite(k) ? k/Math.sqrt(1 + k*k) : 1;
+    const mass     = this.ball1_.getMass();
+
+    // ★ 평면에서만 damping 적용 ★
+    const y     = this.pathPoint_.getY();
+    const userB = this.damping_;
+    const b     = (Math.abs(y - this.lowestPoint_) < 1e-3) ? userB : 0;
+
+    change[TRACK_V] =
+      - this.gravity_ * this.pathPoint_.direction * sinTheta
+      - b * vars[TRACK_V] / mass;
+
     if (this.hasSpring_) {
       let tangent: Vector;
       if (!isFinite(k)) {
         tangent = new Vector(0, k>0 ? 1 : -1, 0);
       } else {
-        tangent = new Vector(1, k, 0);
-        tangent = tangent.normalize().multiply(this.pathPoint_.direction);
+        tangent = new Vector(1, k, 0).normalize()
+                    .multiply(this.pathPoint_.direction);
       }
       const force = this.spring_.calculateForces()[0];
-      Util.assert(force.getBody() == this.ball1_);
-      const f = force.getVector();
+      const f     = force.getVector();
       change[TRACK_V] += f.dotProduct(tangent) / mass;
     }
   }
   return null;
-};
+}
+
 
 /**
 */
